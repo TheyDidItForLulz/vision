@@ -1,0 +1,5 @@
+#!/bin/bash
+echo "
+	syntax: ./compile [filename.cpp] [binary name]
+"
+g++ $1 -o $2 `pkg-config --cflags --libs opencv`
