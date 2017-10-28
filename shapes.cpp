@@ -36,7 +36,7 @@ static double angle( Point pt1, Point pt2, Point pt0 )
     return (dx1*dx2 + dy1*dy2)/sqrt((dx1*dx1 + dy1*dy1)*(dx2*dx2 + dy2*dy2) + 1e-10);
 }
 
-// function to find distance between points
+// function to find distance between the points
 static double find_dist(Point p1, Point p2)
 {
 	double dx = p2.x - p1.x;
@@ -134,16 +134,34 @@ static void findShapes(const Mat& image, vector<vector<Point> >& shapes )
             findContours(gray, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);
 
             vector<Point> approx;
-			vector<Point> more_approx;
-			vector<Point> one_more_approx;
+//			vector<Point> more_approx;
+//			vector<Point> one_more_approx;
 
             // test each contour
             for( size_t i = 0; i < contours.size(); i++ )
             {
                 // approximate contour with accuracy proportional
                 // to the contour perimeter
+
                 approxPolyDP(Mat(contours[i]), approx, arcLength(Mat(contours[i]), true)*0.02, true);
-                approxPolyDP(Mat(contours[i]), more_approx, arcLength(Mat(contours[i]), true)*0.002, true);
+				
+				if(approx.size() >= 3)
+				{
+					for(int i = 0; i < approx.size() - 3; i++)
+					{
+						double cosine = angle(approx[i], approx[i + 2], approx[i + 1]);
+						if(cosine > -0.2 && cosine < 0.2)
+						{
+							vector<Point> v_angle;
+							v_angle.push_back(approx[i]);
+							v_angle.push_back(approx[i + 1]);
+							v_angle.push_back(approx[i + 2]);
+							shapes.push_back(v_angle);
+						}
+					}
+				}
+
+/*              approxPolyDP(Mat(contours[i]), more_approx, arcLength(Mat(contours[i]), true)*0.002, true);
 				approxPolyDP(Mat(contours[i]), one_more_approx, arcLength(Mat(contours[i]), true)*0.09, true);
 
                 // square contours should have 4 vertices after approximation
@@ -152,15 +170,12 @@ static void findShapes(const Mat& image, vector<vector<Point> >& shapes )
                 // Note: absolute value of an area is used because
                 // area may be positive or negative - in accordance with the
                 // contour orientation
-
-				for(int j = 0; j < approx.size(); j++)
+				for(int j = 0; j < less_approx.size(); j++)
 				{
-					printf("i: %i x: %i y: %i\n", j, (int)approx[j].x, (int)approx[j].y);
-                    shapes.push_back(approx);
+					printf("i: %i x: %i y: %i\n", j, (int)less_approx[j].x, (int)less_approx[j].y);
+                    shapes.push_back(less_approx);
 				}
 				continue;
-//				return;
-
                 if( approx.size() == 4 &&
                     fabs(contourArea(Mat(approx))) > MIN_AREA &&
                     isContourConvex(Mat(approx)) )
@@ -183,7 +198,7 @@ static void findShapes(const Mat& image, vector<vector<Point> >& shapes )
 				else if(check_round(more_approx))
 					shapes.push_back(more_approx);
 		//		else if( checkLamp(one_more_approx))
-		//			shapes.push_back(one_more_approx);
+		//			shapes.push_back(one_more_approx); */
             }
         }
     }
