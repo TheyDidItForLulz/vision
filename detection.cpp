@@ -6,8 +6,9 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<math.h>
-#include<string.h>
+#include<string>
 #include<vector>
+#include<fstream>
 
 //
 //	Mat.ptr -> y ; m1[n] -> x
@@ -49,7 +50,7 @@ int main(int argc, char** argv)
 	while(1)
 	{
 		unsigned char* mat = gray.ptr(r);
-		if(mat[c] < 55)
+		if(mat[c] < 200)
 		{
 			width++;
 			r++;
@@ -58,9 +59,33 @@ int main(int argc, char** argv)
 	}
 	printf("width: %i\n", width);
 	
-	int magic = 30;
-	int thresh_magic = 180;
-	
+	int magic, thresh_magic = 200;
+	switch(width)
+	{
+		case 1:
+			magic = 11;
+			break;
+		case 2:
+			magic = 25;
+			thresh_magic += 5;
+			break;
+		case 3:
+			magic = 39; // 37 - 41
+			break;
+		case 4:
+			magic = 58; // 51 - 65
+			break;
+		case 5:
+			magic = 90; // 81 - 151
+			break;
+		case 6:
+			magic = 109; // 101 - 115
+			break;
+		default:
+			magic = 110;
+			thresh_magic -= 10 * (width - 6);
+			break;
+	}
 	std::vector<std::vector<cv::Point> > contours;
 
 	cv::Mat blur;
@@ -77,7 +102,7 @@ int main(int argc, char** argv)
 	
 	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-/*	for(int i = 0; i < contours.size(); i++)
+	for(int i = 0; i < contours.size(); i++)
 	{
 		if(contours[i].size() > 1)
 		{
@@ -97,9 +122,9 @@ int main(int argc, char** argv)
 			cv::Point center;
 			center.x = (p1.x + p2.x) / 2;
 			center.y = (p1.y + p2.y) / 2;
-			cv::circle(thresh, center, maxdiffcont, (255, 255, 255), 2);
+			cv::circle(thresh, center, maxdiffcont, (128, 128, 128), 2);
 		}
-	}*/
+	}
 	
 	cv::imshow("TEST", gray);
 	cv::imshow("TEST2", blur);
