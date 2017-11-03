@@ -122,7 +122,7 @@ int main(int argc, char** argv)
 			cv::Point center;
 			center.x = (p1.x + p2.x) / 2;
 			center.y = (p1.y + p2.y) / 2;
-			cv::circle(thresh, center, maxdiffcont, (128, 128, 128), 2);
+			cv::circle(thresh, center, maxdiffcont, (128, 128, 128), 1);
 		}
 	}
 	
