@@ -15,7 +15,7 @@
 //	Mat.ptr -> y ; m1[n] -> x
 //
 
-double find_cosine(Point p1, Point p0, Point p2)
+double find_cosine(cv::Point pt1, cv::Point pt0, cv::Point pt2)
 {
 	double dx1 = pt1.x - pt0.x;
 	double dy1 = pt1.y - pt0.y;
