@@ -9,20 +9,35 @@
 #include<string>
 #include<vector>
 #include<fstream>
+#include<utility>
 
 //
 //	Mat.ptr -> y ; m1[n] -> x
 //
 
-int main(int argc, char** argv)
+double find_cosine(Point p1, Point p0, Point p2)
 {
-	cv::namedWindow("TEST", 1);
-	cv::namedWindow("TEST2", 2);
-	cv::namedWindow("TEST3", 3);
-	cv::Mat image = cv::imread(argv[1]);
-	cv::Mat gray;
-	cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
-	int maxlen = -1, width = 0, r, c;
+	double dx1 = pt1.x - pt0.x;
+	double dy1 = pt1.y - pt0.y;
+	double dx2 = pt2.x - pt0.x;
+	double dy2 = pt2.y - pt0.y;
+	return (dx1 * dx2 + dy1 * dy2) / sqrt((dx1 * dx1 + dy1 * dy1) * (dx2 * dx2 + dy2 * dy2));
+}
+
+void init()
+{
+	cv::namedWindow("TEST");
+	cv::namedWindow("TEST2");
+	cv::namedWindow("TEST3");
+}
+
+void clean()
+{
+	cv::destroyAllWindows();
+}
+
+void find_maxlen(cv::Mat gray, int& maxlen, int& r, int& c)
+{
 	for(int i = 0; i < gray.rows; i++)
 	{
 		unsigned char* mat = gray.ptr(i);
@@ -45,8 +60,12 @@ int main(int argc, char** argv)
 			}
 		}
 	}
-	printf("maxlen: %i\n", maxlen);
+//	printf("maxlen: %i\n", maxlen);
 	c -= maxlen / 3;
+}
+
+void find_width(cv::Mat gray, int& width, int r, int c)
+{
 	while(1)
 	{
 		unsigned char* mat = gray.ptr(r);
@@ -57,8 +76,62 @@ int main(int argc, char** argv)
 		}
 		else break;
 	}
-	printf("width: %i\n", width);
+//	printf("width: %i\n", width);
+}
+
+void draw_circles(std::vector<std::vector<cv::Point> > contours, cv::Mat& thresh, std::vector<std::pair<cv::Point, int> >& areas)
+{
+	for(int i = 0; i < contours.size(); i++)
+	{
+		if(contours[i].size() > 1)
+		{
+			int maxdiffcont = -1;
+			cv::Point p1 = contours[i][0];
+			cv::Point p2;
+			for(int j = 1; j < contours[i].size(); j++)
+			{
+				cv::Point t_p2 = contours[i][j];
+				int diffcont = sqrt((p1.x - t_p2.x) * (p1.x - t_p2.x) + (p1.y - t_p2.y) * (p1.y - t_p2.y));
+				if(diffcont > maxdiffcont)
+				{
+					p2 = t_p2;
+					maxdiffcont = diffcont;
+				}
+			}
+			cv::Point center;
+			center.x = (p1.x + p2.x) / 2;
+			center.y = (p1.y + p2.y) / 2;
+			cv::circle(thresh, center, maxdiffcont, (128, 128, 128), 1);
+			areas.push_back({center, maxdiffcont});
+		}
+	}
+}
+
+bool find_rect(cv::Point center, int radius)
+{
 	
+}
+
+void find_shapes(std::vector<std::pair<cv::Point, int> > areas)
+{
+	for(int i = 0; i < areas.size(); i++)
+	{
+		if(find_rect(areas[i].first, areas[i].second))
+		{
+			printf("Rect found\n");
+		}
+	}
+}
+
+int main(int argc, char** argv)
+{
+	init();
+	cv::Mat image = cv::imread(argv[1]);
+	cv::Mat gray;
+	cv::cvtColor(image, gray, cv::COLOR_BGR2GRAY);
+	int maxlen = -1, width = 0, r, c;
+	find_maxlen(gray, maxlen, r, c);
+	find_width(gray, width, r, c);
 	int magic, thresh_magic = 200;
 	switch(width)
 	{
@@ -101,35 +174,16 @@ int main(int argc, char** argv)
 	cv::threshold(blur, thresh, thresh_magic, 255, cv::THRESH_BINARY_INV);
 	
 	cv::findContours(thresh, contours, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
-
-	for(int i = 0; i < contours.size(); i++)
-	{
-		if(contours[i].size() > 1)
-		{
-			int maxdiffcont = -1;
-			cv::Point p1 = contours[i][0];
-			cv::Point p2;
-			for(int j = 1; j < contours[i].size(); j++)
-			{
-				cv::Point t_p2 = contours[i][j];
-				int diffcont = sqrt((p1.x - t_p2.x) * (p1.x - t_p2.x) + (p1.y - t_p2.y) * (p1.y - t_p2.y));
-				if(diffcont > maxdiffcont)
-				{
-					p2 = t_p2;
-					maxdiffcont = diffcont;
-				}
-			}
-			cv::Point center;
-			center.x = (p1.x + p2.x) / 2;
-			center.y = (p1.y + p2.y) / 2;
-			cv::circle(thresh, center, maxdiffcont, (128, 128, 128), 1);
-		}
-	}
 	
+	std::vector<std::pair<cv::Point, int> > areas;
+
+	draw_circles(contours, thresh, areas);
+
 	cv::imshow("TEST", gray);
 	cv::imshow("TEST2", blur);
 	cv::imshow("TEST3", thresh);
 
 	char ch = (char)cv::waitKey();
+	clean();
 	return 0;
 }
