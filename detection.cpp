@@ -63,7 +63,7 @@ void find_maxlen(cv::Mat gray, int& maxlen, int& r, int& c)
 //	printf("maxlen: %i\n", maxlen);
 	c -= maxlen / 3;
 }
-
+// mat1.at<Point3i>(...).x = mat2.at<uint8_t>(...);
 void find_width(cv::Mat gray, int& width, int r, int c)
 {
 	while(1)
@@ -107,16 +107,24 @@ void draw_circles(std::vector<std::vector<cv::Point> > contours, cv::Mat& thresh
 	}
 }
 
-bool find_rect(cv::Point center, int radius)
+bool find_rect(cv::Mat area)
 {
 	
 }
 
-void find_shapes(std::vector<std::pair<cv::Point, int> > areas)
+void find_shapes(std::vector<std::pair<cv::Point, int> > areas, cv::Mat gray)
 {
 	for(int i = 0; i < areas.size(); i++)
 	{
-		if(find_rect(areas[i].first, areas[i].second))
+		cv::Mat tmp(areas[i].second, areas[i].second, CV_8U);
+		for(int j = 0; i < tmp.rows; j++)
+		{
+			for(int k = 0; k < tmp.cols; k++)
+			{
+				tmp.at<uint8_t>(j, k) = gray.at<uint8_t>(j + areas[i].first.x, k + areas[i].first.y);
+			}
+		}
+		if(find_rect(tmp))
 		{
 			printf("Rect found\n");
 		}
