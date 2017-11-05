@@ -109,7 +109,8 @@ void draw_circles(std::vector<std::vector<cv::Point> > contours, cv::Mat& thresh
 
 bool find_rect(cv::Mat area)
 {
-	
+	cv::imshow("test", area);
+	return true;
 }
 
 void find_shapes(std::vector<std::pair<cv::Point, int> > areas, cv::Mat gray)
@@ -117,11 +118,11 @@ void find_shapes(std::vector<std::pair<cv::Point, int> > areas, cv::Mat gray)
 	for(int i = 0; i < areas.size(); i++)
 	{
 		cv::Mat tmp(areas[i].second, areas[i].second, CV_8U);
-		for(int j = 0; i < tmp.rows; j++)
+		for(int j = 0; j < tmp.rows; j++)
 		{
 			for(int k = 0; k < tmp.cols; k++)
 			{
-				tmp.at<uint8_t>(j, k) = gray.at<uint8_t>(j + areas[i].first.x, k + areas[i].first.y);
+				tmp.at<uint8_t>(j, k) = gray.at<uint8_t>(j + areas[i].first.y, k + areas[i].first.x);
 			}
 		}
 		if(find_rect(tmp))
@@ -186,6 +187,8 @@ int main(int argc, char** argv)
 	std::vector<std::pair<cv::Point, int> > areas;
 
 	draw_circles(contours, thresh, areas);
+	
+	find_shapes(areas, gray);
 
 	cv::imshow("TEST", gray);
 	cv::imshow("TEST2", blur);
