@@ -85,24 +85,21 @@ void draw_circles(std::vector<std::vector<cv::Point> > contours, cv::Mat& thresh
 	{
 		if(contours[i].size() > 1)
 		{
-			int maxdiffcont = -1;
-			cv::Point p1 = contours[i][0];
-			cv::Point p2;
-			for(int j = 1; j < contours[i].size(); j++)
+			cv::Point pmin = cv::Point(100500, 100500), pmax = cv::Point(-100500, -100500);
+			for(int j = 0; j < contours[i].size(); j++)
 			{
-				cv::Point t_p2 = contours[i][j];
-				int diffcont = sqrt((p1.x - t_p2.x) * (p1.x - t_p2.x) + (p1.y - t_p2.y) * (p1.y - t_p2.y));
-				if(diffcont > maxdiffcont)
-				{
-					p2 = t_p2;
-					maxdiffcont = diffcont;
-				}
+				if(contours[i][j].x < pmin.x) pmin.x = contours[i][j].x;
+				else if(contours[i][j].x > pmax.x) pmax.x = contours[i][j].x;
+				if(contours[i][j].y < pmin.y) pmin.y = contours[i][j].y;
+				else if(contours[i][j].y > pmax.y) pmax.y = contours[i][j].y;
 			}
+			int diameter = sqrt((pmax.x - pmin.x) * (pmax.x - pmin.x) + (pmax.y - pmin.y) * (pmax.y - pmin.y));
 			cv::Point center;
-			center.x = (p1.x + p2.x) / 2;
-			center.y = (p1.y + p2.y) / 2;
-			cv::circle(thresh, center, maxdiffcont, (128, 128, 128), 1);
-			areas.push_back({center, maxdiffcont});
+			center.x = (pmin.x + pmax.x) / 2;
+			center.y = (pmin.y + pmax.y) / 2;
+			cv::circle(thresh, center, diameter / 2, (128, 128, 128), 1);
+//			printf("cx: %i cy: %i d: %i\n", center.x, center.y, diameter);
+			areas.push_back({center, diameter});
 		}
 	}
 }
@@ -117,17 +114,18 @@ void find_shapes(std::vector<std::pair<cv::Point, int> > areas, cv::Mat gray)
 {
 	for(int i = 0; i < areas.size(); i++)
 	{
-		cv::Mat tmp(areas[i].second, areas[i].second, CV_8U);
-		for(int j = 0; j < tmp.rows; j++)
+		cv::Mat area(areas[i].second, areas[i].second, CV_8U);
+		for(int j = 0; j < area.rows; j++)
 		{
-			for(int k = 0; k < tmp.cols; k++)
+			for(int k = 0; k < area.cols; k++)
 			{
-				tmp.at<uint8_t>(j, k) = gray.at<uint8_t>(j + areas[i].first.y, k + areas[i].first.x);
+				area.at<uint8_t>(j, k) = gray.at<uint8_t>(j + areas[i].first.y - areas[i].second / 2, 
+						k + areas[i].first.x - areas[i].second / 2);
 			}
 		}
-		if(find_rect(tmp))
+		if(find_rect(area))
 		{
-			printf("Rect found\n");
+			printf("Chleb found\n");
 		}
 	}
 }
