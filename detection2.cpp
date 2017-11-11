@@ -12,6 +12,8 @@
 #include<utility>
 #include<algorithm>
 
+#define MIN_ELEMENT_SQUARE 16
+
 struct Point2d
 {
 	int r, c;
@@ -220,7 +222,7 @@ void find_elements(std::vector<Elem>& elements, int dir1, int dir2, int i, int j
 	}
 }
 
-void recognize(Elem e, vb2& pic, cv::Mat& out)
+bool recognize(Elem e, vb2& pic, cv::Mat& out)
 {
 	int diameter2 = ((e.v1.r - e.v2.r) * (e.v1.r - e.v2.r) + (e.v1.c - e.v2.c) * (e.v1.c - e.v2.c));
 	float diameter = sqrt(diameter2);
@@ -233,7 +235,7 @@ void recognize(Elem e, vb2& pic, cv::Mat& out)
 	int dots_count = 0;
 	int max_r = std::max(e.v1.r, e.v2.r), min_r = std::min(e.v1.r, e.v2.r);
 	int max_c = std::max(e.v1.c, e.v2.c), min_c = std::min(e.v1.c, e.v2.c);
-	if(e.v1.dir < 3)
+/*	if(e.v1.dir < 3)
 	{
 		for(int i = min_r - radius - 2; i < max_r + radius + 2; i++)
 		{
@@ -275,17 +277,17 @@ void recognize(Elem e, vb2& pic, cv::Mat& out)
 	{
 		center.r /= dots_count;
 		center.c /= dots_count;
-	}
-//	center.r = (e.v1.r + e.v2.r) / 2;
-//	center.c = (e.v1.c + e.v2.c) / 2;
+	}*/
+	center.r = (e.v1.r + e.v2.r) / 2;
+	center.c = (e.v1.c + e.v2.c) / 2;
 	float eps = 0.325;
-//	dots_count = 0;
+	dots_count = 0;
 	float round_prob = 0;
 	float rect_prob = 0;
-	for(int i = center.r - radius - 1; i <= center.r + radius + 1; i++)
+	for(int i = center.r - radius; i <= center.r + radius; i++)
 	{
 		int row_dots_count = 0;
-		for(int j = center.c - radius - 1; j <= center.c + radius + 1; j++)
+		for(int j = center.c - radius; j <= center.c + radius; j++)
 		{
 			try
 			{
@@ -293,7 +295,6 @@ void recognize(Elem e, vb2& pic, cv::Mat& out)
 				{
 					row_dots_count++;
 					dots_count++;
-					pic[i][j] = false;
 					// round check
 					int l2 = (center.r - i) * (center.r - i) + (center.c - j) * (center.c - j);
 					if(std::abs(l2 / (float)radius2 - 1) < eps)
@@ -310,6 +311,7 @@ void recognize(Elem e, vb2& pic, cv::Mat& out)
 			rect_prob += row_dots_count;
 		}
 	}
+	if(dots_count < MIN_ELEMENT_SQUARE) return false;
 	round_prob /= dots_count;
 	rect_prob /= dots_count;
 	if(rect_prob > round_prob)
@@ -321,6 +323,7 @@ void recognize(Elem e, vb2& pic, cv::Mat& out)
 		cv::circle(out, cv::Point(center.c, center.r), radius, cv::Scalar(255, 255, 255));
 	}
 	printf("dots_count: %i round prob: %f rect prob: %f\n", dots_count, round_prob, rect_prob);
+	return true;
 }
 
 int main(int argc, char** argv)
@@ -444,7 +447,11 @@ int main(int argc, char** argv)
 		{
 			printf("i: %i vc: %i v1r: %i v1c: %i v1dir: %i v2r: %i v2c: %i v2dir: %i\n", 
 					i, e.vc, e.v1.r, e.v1.c, e.v1.dir, e.v2.r, e.v2.c, e.v2.dir);
-			recognize(elements[i], dest_array, out);
+			if(!recognize(elements[i], dest_array, out))
+			{
+				elements.erase(std::find(elements.begin(), elements.end(), elements[i]));
+				--i;
+			}
 		}
 		else
 		{
