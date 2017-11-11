@@ -174,19 +174,6 @@ void skeletonizate(Point2d size, vb2& src, vb2& dest, vb2& borders, cv::Mat& out
 			}
 		}
 	}
-	for(int i = 0; i < size.r; i++)
-	{
-		for(int j = 0; j < size.c; j++)
-		{
-//			if(dists[i][j])
-//			{
-//				printf("1");
-				out.at<uint8_t>(i, j) = static_cast<uint8_t>(255 - 255 / (dest[i][j] + 1));
-//			}
-//			else printf("0");
-		}
-//		printf("\n");
-	}
 }
 
 void shift_pic(vb2& pic)
@@ -233,39 +220,107 @@ void find_elements(std::vector<Elem>& elements, int dir1, int dir2, int i, int j
 	}
 }
 
-void recognize(Elem e, vb2 pic)
+void recognize(Elem e, vb2& pic, cv::Mat& out)
 {
+	int diameter2 = ((e.v1.r - e.v2.r) * (e.v1.r - e.v2.r) + (e.v1.c - e.v2.c) * (e.v1.c - e.v2.c));
+	float diameter = sqrt(diameter2);
+	int radius2 = diameter2 / 4;
+	float radius = diameter / 2;
+
 	Point2d center;
-	center.r = (e.v1.r + e.v2.r) / 2;
-	center.c = (e.v1.c + e.v2.c) / 2;
-	float eps = 0.25;
-	int radius2 = (center.r - e.v1.r) * (center.r - e.v1.r) + (center.c - e.v1.c) * (center.c - e.v1.c);
-	float radius = sqrt(radius2);
+	center.r = 0;
+	center.c = 0;
 	int dots_count = 0;
-	int round_prob = 0;
+	int max_r = std::max(e.v1.r, e.v2.r), min_r = std::min(e.v1.r, e.v2.r);
+	int max_c = std::max(e.v1.c, e.v2.c), min_c = std::min(e.v1.c, e.v2.c);
 	if(e.v1.dir < 3)
 	{
-		for(int i = center.r - radius - 1; i <= center.r + radius + 1; i++)
+		for(int i = min_r - radius - 2; i < max_r + radius + 2; i++)
 		{
-			for(int j = center.c - radius - 1; j <= center.c + radius + 1; j++)
+			for(int j = min_c - 2; j < max_c + 2; j++)
 			{
 				try
 				{
 					if(pic.at(i).at(j))
 					{
+						center.r += i;
+						center.c += j;
 						dots_count++;
-						int l2 = (center.r - i) * (center.r - i) + (center.c - j) * (center.c - j);
-						if(std::abs(l2 / (float)radius2 - 1) < eps)
-						{
-							round_prob++;
-						}
 					}
 				}
 				catch(...){}
 			}
 		}
 	}
-	printf("all: %i rnd: %i prob:%f\n", dots_count, round_prob, (float)round_prob / (float)dots_count);
+	else
+	{
+		for(int i = min_r - 2; i < max_r + 2; i++)
+		{
+			for(int j = min_c - radius - 2; j < max_c + radius + 2; j++)
+			{
+				try
+				{
+					if(pic.at(i).at(j))
+					{
+						center.r += i;
+						center.c += j;
+						dots_count++;
+					}
+				}
+				catch(...){}
+			}
+		}
+	}
+	if(dots_count != 0)
+	{
+		center.r /= dots_count;
+		center.c /= dots_count;
+	}
+//	center.r = (e.v1.r + e.v2.r) / 2;
+//	center.c = (e.v1.c + e.v2.c) / 2;
+	float eps = 0.325;
+//	dots_count = 0;
+	float round_prob = 0;
+	float rect_prob = 0;
+	for(int i = center.r - radius - 1; i <= center.r + radius + 1; i++)
+	{
+		int row_dots_count = 0;
+		for(int j = center.c - radius - 1; j <= center.c + radius + 1; j++)
+		{
+			try
+			{
+				if(pic.at(i).at(j))
+				{
+					row_dots_count++;
+					dots_count++;
+					pic[i][j] = false;
+					// round check
+					int l2 = (center.r - i) * (center.r - i) + (center.c - j) * (center.c - j);
+					if(std::abs(l2 / (float)radius2 - 1) < eps)
+					{
+						round_prob++;
+					}
+				}
+			}
+			catch(...){}
+		}
+		// rect check
+		if(row_dots_count == 2 || row_dots_count >= radius)
+		{
+			rect_prob += row_dots_count;
+		}
+	}
+	round_prob /= dots_count;
+	rect_prob /= dots_count;
+	if(rect_prob > round_prob)
+	{
+		cv::line(out, cv::Point(min_c, min_r), cv::Point(max_c, max_r), cv::Scalar(255, 255, 255));
+	}
+	else
+	{
+		cv::circle(out, cv::Point(center.c, center.r), radius, cv::Scalar(255, 255, 255));
+	}
+	printf("dots_count: %i round prob: %f rect prob: %f\n", dots_count, round_prob, rect_prob);
 }
 
 int main(int argc, char** argv)
@@ -307,6 +362,20 @@ int main(int argc, char** argv)
 
 	std::vector<Elem> elements;
 	int eps = 2;
+
+	for(int i = 0; i < size.r; i++)
+	{
+		for(int j = 0; j < size.c; j++)
+		{
+//			if(dists[i][j])
+//			{
+//				printf("1");
+				out.at<uint8_t>(i, j) = static_cast<uint8_t>(255 - 255 / (dest_array[i][j] + 1));
+//			}
+//			else printf("0");
+		}
+//		printf("\n");
+	}
 
 	if(!even_width)
 	{
@@ -375,9 +444,7 @@ int main(int argc, char** argv)
 		{
 			printf("i: %i vc: %i v1r: %i v1c: %i v1dir: %i v2r: %i v2c: %i v2dir: %i\n", 
 					i, e.vc, e.v1.r, e.v1.c, e.v1.dir, e.v2.r, e.v2.c, e.v2.dir);
-			cv::circle(out, cv::Point((e.v1.c + e.v2.c) / 2, (e.v1.r + e.v2.r) / 2), 
-					sqrt((e.v1.c - e.v2.c) * (e.v1.c - e.v2.c) + (e.v1.r - e.v2.r) * (e.v1.r - e.v2.r)) / 2, cv::Scalar(255, 255, 255));
-			recognize(elements[i], dest_array);
+			recognize(elements[i], dest_array, out);
 		}
 		else
 		{
@@ -385,6 +452,9 @@ int main(int argc, char** argv)
 			--i;
 		}
 	}
+
+
+
 	cv::imshow("kk", out);
 
 	cv::waitKey(0);
