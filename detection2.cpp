@@ -11,32 +11,52 @@
 #include<vector>
 #include<utility>
 #include<algorithm>
+#include<queue>
 
 #define MIN_ELEMENT_SQUARE 16
 
 struct Point2d
 {
 	int r, c;
+	bool operator==(const Point2d & other) {
+		return memcmp(this, &other, sizeof(Point2d)) == 0;
+	}
 };
 
 struct Vertex
 {
 	int r = -1, c = -1;
 	int dir = -1;
+	bool operator==(const Vertex & other) {
+		return memcmp(this, &other, sizeof(Vertex)) == 0;
+	}
 };
 
 struct Elem
 {
+	int id, idv1 = -1, idv2 = -1;
+	std::string type = "none";
 	int vc = 0;
 	Vertex v1, v2;
 	bool valid = false;
 	bool operator==(const Elem & other) {
-		return memcmp(this, &other, sizeof(Elem)) == 0;
+		if(id == other.id && idv1 == other.idv1 && idv2 == other.idv2 
+				&& type == other.type && vc == other.vc && v1 == other.v1 
+				&& v2 == other.v2 && valid == other.valid)
+		{
+			return true;
+		}
+		return false;
 	}
 };
 
 typedef std::vector<std::vector<bool> > vb2;
 typedef std::vector<std::vector<int> > vi2;
+
+float find_distance_between_points(Point2d b, Point2d e)
+{
+	return sqrt((b.r - e.r) * (b.r - e.r) + (b.c - e.c) * (b.c - e.c));
+}
 
 void find_borders(Point2d s, vb2& src, vb2& dest)
 {
@@ -147,21 +167,6 @@ void skeletonizate(Point2d size, vb2& src, vb2& dest, vb2& borders, cv::Mat& out
 					{
 						dest[i][j] = true;
 					}
-/*					if (dest[i][j] && dists[i][j] == max_dist - 1) {
-						int a = 2;
-						a = 3;
-						a = 666;
-					}
-					if(curr > dists[i - 1][j - 1] && curr > dists[i + 1][j + 1])
-					{
-						dest[i][j] = true;
-						continue;
-					}
-					if(curr > dists[i - 1][j + 1] && curr > dists[i + 1][j - 1])
-					{
-						dest[i][j] = true;
-						continue;
-					}*/
 				}
 			}
 		}
@@ -222,71 +227,36 @@ void find_elements(std::vector<Elem>& elements, int dir1, int dir2, int i, int j
 	}
 }
 
-bool recognize(Elem e, vb2& pic, cv::Mat& out)
+bool recognize(Elem& e, vb2& pic, cv::Mat& out)
 {
 	int diameter2 = ((e.v1.r - e.v2.r) * (e.v1.r - e.v2.r) + (e.v1.c - e.v2.c) * (e.v1.c - e.v2.c));
 	float diameter = sqrt(diameter2);
 	int radius2 = diameter2 / 4;
 	float radius = diameter / 2;
-
 	Point2d center;
 	center.r = 0;
 	center.c = 0;
 	int dots_count = 0;
 	int max_r = std::max(e.v1.r, e.v2.r), min_r = std::min(e.v1.r, e.v2.r);
 	int max_c = std::max(e.v1.c, e.v2.c), min_c = std::min(e.v1.c, e.v2.c);
-/*	if(e.v1.dir < 3)
-	{
-		for(int i = min_r - radius - 2; i < max_r + radius + 2; i++)
-		{
-			for(int j = min_c - 2; j < max_c + 2; j++)
-			{
-				try
-				{
-					if(pic.at(i).at(j))
-					{
-						center.r += i;
-						center.c += j;
-						dots_count++;
-					}
-				}
-				catch(...){}
-			}
-		}
-	}
-	else
-	{
-		for(int i = min_r - 2; i < max_r + 2; i++)
-		{
-			for(int j = min_c - radius - 2; j < max_c + radius + 2; j++)
-			{
-				try
-				{
-					if(pic.at(i).at(j))
-					{
-						center.r += i;
-						center.c += j;
-						dots_count++;
-					}
-				}
-				catch(...){}
-			}
-		}
-	}
-	if(dots_count != 0)
-	{
-		center.r /= dots_count;
-		center.c /= dots_count;
-	}*/
 	center.r = (e.v1.r + e.v2.r) / 2;
 	center.c = (e.v1.c + e.v2.c) / 2;
 	float eps = 0.325;
 	dots_count = 0;
 	float round_prob = 0;
 	float rect_prob = 0;
+	bool ampermeter = false;
+	bool voltmeter = false;
+	bool resistor = false;
+	bool battery = false;
+	bool dots = false;
+	int parallel_lines_count = 0;
+	int voltmeter_dots = 0;
+	int buff_dist_between = -1;
 	for(int i = center.r - radius; i <= center.r + radius; i++)
 	{
 		int row_dots_count = 0;
+		std::vector<Point2d> points;
 		for(int j = center.c - radius; j <= center.c + radius; j++)
 		{
 			try
@@ -301,29 +271,182 @@ bool recognize(Elem e, vb2& pic, cv::Mat& out)
 					{
 						round_prob++;
 					}
+					else
+					{
+						if(i > center.r)
+						{
+							Point2d p;
+							p.r = i;
+							p.c = j;
+							points.push_back(p);
+						}
+					}
 				}
 			}
 			catch(...){}
 		}
-		// rect check
-		if(row_dots_count == 2 || row_dots_count >= radius)
+		if((points.size() == 2 || points.size() == 1) && i > center.r)
 		{
-			rect_prob += row_dots_count;
+			if(buff_dist_between == -1 && points.size() == 2)
+			{
+				buff_dist_between = find_distance_between_points(points[0], points[1]);
+			}
+			else if(buff_dist_between == -1 && points.size() == 1)
+			{
+				buff_dist_between == 0;
+			}
+			else if(buff_dist_between >= (points.size() == 1 ? 0 : find_distance_between_points(points[0], points[1])))
+			{
+				voltmeter_dots++;
+			}
+		}
+		if(row_dots_count > (radius / 4 < 4 ? 4 : radius / 4) && i < center.r + radius / 4 && i > center.r - radius / 4)	//
+		{																													// ampermeter check
+			ampermeter = true;																								//
+		}																													//
+		// rect check
+		if(e.v1.dir < 3)
+		{
+			if(row_dots_count == 2 || row_dots_count >= (radius * 3) / 2)				// there was just radius
+			{
+				if(row_dots_count >= (radius * 3) / 2)
+				{
+					parallel_lines_count++;
+				}
+				rect_prob += row_dots_count;
+			}
+			else if(row_dots_count < (radius * 3) / 2 && row_dots_count > radius / 2)	//
+			{																			// branching check
+				rect_prob += row_dots_count;											//
+//				printf("Found ya! Here are sum dots\n");								// I can rewrite it later as finding holes in lines
+				dots = true;
+			}																			//
 		}
 	}
+	if(voltmeter_dots >= radius / 5) // or 8, for more approx, but this way it can see less
+	{
+		voltmeter = true;
+	}
+	if(e.v1.dir >= 3)
+	{
+		for(int i = center.c - radius; i <= center.c + radius; i++)
+		{
+			int col_dots_count = 0;
+			for(int j = center.r - radius; j <= center.r + radius; j++)
+			{
+				try
+				{
+					if(pic.at(j).at(i))
+					{
+						col_dots_count++;
+					}
+				}
+				catch(...){}
+			}
+			if(col_dots_count == 2 || col_dots_count >= (radius * 3) / 2)				// there too
+			{
+				if(col_dots_count >= (radius * 3) / 2)
+				{
+					parallel_lines_count++;
+				}
+				rect_prob += col_dots_count;
+			}
+			else if(col_dots_count < (radius * 3) / 2 && col_dots_count > radius / 2)	//
+			{																			// branching check
+				rect_prob += col_dots_count;											//
+//				printf("Found ya! Here are sum dots\n");								// I can rewrite it later as finding holes in lines
+				dots = true;
+			}																			//
+		}
+	}
+	if(parallel_lines_count == 0) battery = true;
+	else if(parallel_lines_count == 2) resistor = true;
 	if(dots_count < MIN_ELEMENT_SQUARE) return false;
 	round_prob /= dots_count;
 	rect_prob /= dots_count;
 	if(rect_prob > round_prob)
 	{
+		if(dots) e.type = "dots";
+		else
+		{		
+			if(battery) e.type = "battery";
+			if(resistor) e.type = "resistor";
+		}
 		cv::line(out, cv::Point(min_c, min_r), cv::Point(max_c, max_r), cv::Scalar(255, 255, 255));
 	}
 	else
 	{
+		if(ampermeter)
+		{
+			e.type = "ampermeter";
+	//		cv::line(out, cv::Point(min_c, min_r), cv::Point(max_c, max_r), cv::Scalar(255, 255, 255));
+		}
+		if(voltmeter) e.type = "voltmeter";
+		if(!ampermeter && !voltmeter) e.type = "lamp";										// ne kostyl
 		cv::circle(out, cv::Point(center.c, center.r), radius, cv::Scalar(255, 255, 255));
 	}
-	printf("dots_count: %i round prob: %f rect prob: %f\n", dots_count, round_prob, rect_prob);
+//	printf("dots_count: %i round prob: %f rect prob: %f\n", dots_count, round_prob, rect_prob);
 	return true;
+}
+
+void bfs(std::vector<Elem>& elements, vb2 pic, Vertex s, int id)
+{
+	printf("Entering bfs\n");
+	bool break_bfs = false;
+	std::queue<Vertex> q;
+	q.push(s);
+	vb2 used(pic.size(), std::vector<bool>(pic[0].size()));
+	used[s.r][s.c] = true;
+	while(!q.empty())
+	{
+		if(break_bfs) break;
+		Vertex curr = q.front();
+		q.pop();
+		for(int i = curr.r - 1; i <= curr.r + 1; i++)
+		{
+			for(int j = curr.c - 1; j <= curr.c + 1; j++)
+			{
+				try
+				{
+					if(pic[i][j] && !used[i][j])
+					{
+						Vertex tmp;
+						tmp.r = i;
+						tmp.c = j;
+						q.push(tmp);
+						used[i][j] = true;
+						for(int _i = 0; _i < elements.size(); _i++)
+						{
+							if(elements[_i].v1.r == i && elements[_i].v1.c == j)
+							{
+								elements[_i].idv1 = id;
+								elements[id].idv1 = _i;
+								break_bfs = true;
+							}
+							else if(elements[_i].v2.r == i && elements[_i].v2.c == j)
+							{
+								elements[_i].idv2 = id;
+								elements[id].idv1 = _i;
+								break_bfs = true;
+							}
+						}
+					}
+				}
+				catch(...){}
+			}
+		}
+	}
+}
+
+void find_connections(std::vector<Elem>& elements, vb2 pic)
+{
+	for(int i = 0; i < elements.size(); i++)
+	{
+		Vertex s = elements[i].v1;
+		bfs(elements, pic, s, i);
+		s = elements[i].v2;
+		bfs(elements, pic, s, i);
+	}
 }
 
 int main(int argc, char** argv)
@@ -445,12 +568,16 @@ int main(int argc, char** argv)
 		Elem e = elements[i];
 		if(e.valid)
 		{
-			printf("i: %i vc: %i v1r: %i v1c: %i v1dir: %i v2r: %i v2c: %i v2dir: %i\n", 
-					i, e.vc, e.v1.r, e.v1.c, e.v1.dir, e.v2.r, e.v2.c, e.v2.dir);
+//			printf("i: %i vc: %i v1r: %i v1c: %i v1dir: %i v2r: %i v2c: %i v2dir: %i\n", 
+//					i, e.vc, e.v1.r, e.v1.c, e.v1.dir, e.v2.r, e.v2.c, e.v2.dir);
 			if(!recognize(elements[i], dest_array, out))
 			{
 				elements.erase(std::find(elements.begin(), elements.end(), elements[i]));
 				--i;
+			}
+			else
+			{
+				elements[i].id = i;
 			}
 		}
 		else
@@ -459,11 +586,13 @@ int main(int argc, char** argv)
 			--i;
 		}
 	}
-
-
-
+	find_connections(elements, pic);
+	for(int i = 0; i < elements.size(); i++)
+	{
+		Elem e = elements[i];
+		printf("id: %i type: %s id1: %i id2: %i\n", e.id, e.type.c_str(), e.idv1, e.idv2);
+	}
 	cv::imshow("kk", out);
-
 	cv::waitKey(0);
 	return 0;
 }
